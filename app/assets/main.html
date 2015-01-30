@@ -51,6 +51,7 @@
     }
 
     onLoad = function() {
+      $.ajaxSetup({ cache: false});
       try {
         // IE8 warning
         var htmlElement = document.querySelector("html");
