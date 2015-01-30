@@ -13,6 +13,8 @@ AuthModal = require 'views/core/AuthModal'
 SubscribeModal = require 'views/core/SubscribeModal'
 Level = require 'models/Level'
 utils = require 'core/utils'
+require 'vendor/three'
+ParticleMan = require 'core/ParticleMan'
 
 trackedHourOfCode = false
 
@@ -133,6 +135,7 @@ module.exports = class CampaignView extends RootView
     context = super(context)
     context.campaign = @campaign
     context.levels = _.values($.extend true, {}, @campaign.get('levels'))
+    context.levelsCompleted = context.levelsTotal = 0
     for level in context.levels
       level.position ?= { x: 10, y: 10 }
       level.locked = not me.ownsLevel level.original
@@ -143,9 +146,14 @@ module.exports = class CampaignView extends RootView
       level.color = 'rgb(255, 80, 60)'
       if level.requiresSubscription
         level.color = 'rgb(80, 130, 200)'
+      if unlocksHero = _.find(level.rewards, 'hero')?.hero
+        level.unlocksHero = unlocksHero
       if level.unlocksHero
-        level.unlockedHero = level.unlocksHero.originalID in (me.get('earned')?.heroes or [])
+        level.purchasedHero = level.unlocksHero in (me.get('purchased')?.heroes or [])
       level.hidden = level.locked
+      unless level.disabled
+        ++context.levelsTotal
+        ++context.levelsCompleted if @levelStatusMap[level.slug] is 'complete'
 
     @determineNextLevel context.levels if @sessions.loaded
     # put lower levels in last, so in the world map they layer over one another properly.
@@ -161,7 +169,6 @@ module.exports = class CampaignView extends RootView
     context.adjacentCampaigns = _.filter _.values(_.cloneDeep(@campaign.get('adjacentCampaigns') or {})), (ac) =>
       return false if ac.showIfUnlocked and (ac.showIfUnlocked not in me.levels()) and not @editorMode
       ac.name = utils.i18n ac, 'name'
-      ac.description = utils.i18n ac, 'description'
       styles = []
       styles.push "color: #{ac.color}" if ac.color
       styles.push "transform: rotate(#{ac.rotation}deg)" if ac.rotation
@@ -199,6 +206,7 @@ module.exports = class CampaignView extends RootView
             if nextLevel = _.find(@campaign.renderedLevels, original: nextLevelOriginal)
               @createLine level.position, nextLevel.position
     @applyCampaignStyles()
+    @testParticles()
 
   afterInsert: ->
     super()
@@ -249,6 +257,19 @@ module.exports = class CampaignView extends RootView
       for pos in ['top', 'right', 'bottom', 'left']
         @$el.find(".#{pos}-gradient").css 'background-image', "linear-gradient(to #{pos}, #{backgroundColorTransparent} 0%, #{backgroundColor} 100%)"
     @playAmbientSound()
+
+  testParticles: ->
+    return unless @campaign.loaded and me.getForeshadowsLevels()
+    @particleMan ?= new ParticleMan()
+    @particleMan.removeEmitters()
+    @particleMan.attach @$el.find('.map')
+    for level in @campaign.renderedLevels ? {} when level.hidden
+      particleKey = ['level', @terrain]
+      particleKey.push level.type if level.type and level.type isnt 'hero'
+      particleKey.push 'premium' if level.requiresSubscription
+      particleKey.push 'gate' if level.slug in ['kithgard-gates', 'siege-of-stonehold', 'clash-of-clones']
+      continue if particleKey.length is 2  # Don't show basic levels
+      @particleMan.addEmitter level.position.x / 100, level.position.y / 100, particleKey.join('-')
 
   onSessionsLoaded: (e) ->
     return if @editorMode
@@ -360,6 +381,7 @@ module.exports = class CampaignView extends RootView
     resultingMarginX = (pageWidth - resultingWidth) / 2
     resultingMarginY = (pageHeight - resultingHeight) / 2
     @$el.find('.map').css(width: resultingWidth, height: resultingHeight, 'margin-left': resultingMarginX, 'margin-top': resultingMarginY)
+    @testParticles() if @particleMan
 
   playAmbientSound: ->
     return if @ambientSound

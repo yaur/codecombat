@@ -123,18 +123,15 @@ module.exports = class User extends CocoModel
     application.tracker.identify gemPromptGroup: @gemPromptGroup unless me.isAdmin()
     @gemPromptGroup
 
-  getSubscribeCopyGroup: ->
-    # A/B Testing alternate subscribe modal copy
-    return @subscribeCopyGroup if @subscribeCopyGroup
-    group = me.get('testGroupNumber') % 6
-    @subscribeCopyGroup = switch group
-      when 0, 1, 2 then 'original'
-      when 3, 4, 5 then 'new'
-    if (not @get('preferredLanguage') or /^en/.test(@get('preferredLanguage'))) and not me.isAdmin()
-      application.tracker.identify subscribeCopyGroup: @subscribeCopyGroup
-    else
-      @subscribeCopyGroup = 'original'
-    @subscribeCopyGroup
+  getForeshadowsLevels: ->
+    return @foreshadowsLevels if @foreshadowsLevels?
+    group = me.get('testGroupNumber') % 16
+    @foreshadowsLevels = switch group
+      when 0, 1, 2, 3, 4, 5, 6, 7 then true
+      when 8, 9, 10, 11, 12, 13, 14, 15 then false
+    @foreshadowsLevels = true if me.isAdmin()
+    application.tracker.identify foreshadowsLevels: @foreshadowsLevels unless me.isAdmin()
+    @foreshadowsLevels
 
   getVideoTutorialStylesIndex: (numVideos=0)->
     # A/B Testing video tutorial styles

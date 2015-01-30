@@ -12,8 +12,7 @@ class VersionsViewCollection extends CocoCollection
 
   initialize: (@url, @levelID, @model) ->
     super()
-    @url = url + levelID + '/versions'
-    @model = model
+    @url = url + @levelID + '/versions'
 
 module.exports = class VersionsModal extends ModalView
   template: template
@@ -30,7 +29,7 @@ module.exports = class VersionsModal extends ModalView
 
   constructor: (options, @ID, @model) ->
     super options
-    @original = new model(_id: @ID)
+    @original = new @model(_id: @ID)
     @original = @supermodel.loadModel(@original, 'document').model
     @listenToOnce(@original, 'sync', @onViewSync)
 
